@@ -9,4 +9,4 @@ sshtunnel
 pymysql
 clean-text==0.6.0
 transformers==4.35.2
-torch=2.1
+torch==2.1
