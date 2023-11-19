@@ -1,4 +1,5 @@
 import json
+import os.path
 import sqlite3
 
 from geopy.geocoders import Nominatim
@@ -6,6 +7,14 @@ from geopy.geocoders import Nominatim
 
 class LocationDBManager:
     def __init__(self, database_path):
+        if not os.path.exists(database_path):
+            with open("data/locationdb.db_create.sql") as rdr:
+                db_sql = rdr.read()
+
+            db = sqlite3.connect(database_path)
+            db.execute(db_sql)
+            db.close()
+
         self.database_path = database_path
         self.geolocator = Nominatim(user_agent='geoapiExercises', timeout=10)
 
