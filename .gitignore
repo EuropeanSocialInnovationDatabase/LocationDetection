@@ -1,0 +1,3 @@
+/data/locationdb.db
+/flair_ner_model_offline/model.bin
+/data_access_manager/database_access.py
