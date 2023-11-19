@@ -12,8 +12,7 @@ nltk.download('stopwords')
 import numpy as np
 import pandas as pd
 import tldextract
-from flair.data import Sentence
-from flair.models import SequenceTagger
+from transformers import pipeline
 from nltk.corpus import stopwords
 from sklearn.cluster import MeanShift
 
@@ -78,14 +77,10 @@ class LocationDetection:
         self.text_processing_unit = TextProcessingUnit()
 
         self.MONGO_COLLECTION_NAME = MONGO_COLLECTION_NAME
-        # # load NER tagger model
-        # # https://huggingface.co/flair/ner-english-ontonotes-large
-        try:
-            self.tagger = SequenceTagger.load("./flair_ner_model_offline/model.bin")
-        except:
-            self.tagger = SequenceTagger.load("flair/ner-english-large")
 
-        # tagger = SequenceTagger.load("dslim/bert-large-NER")
+        self.tagger = pipeline("token-classification",
+                               model="dslim/bert-base-NER",
+                               aggregation_strategy="simple")
 
         # Clustering algorithm to identify when a project is spread over different counties
         self.ms = MeanShift(bandwidth=None, bin_seeding=True)
@@ -316,7 +311,7 @@ class LocationDetection:
                         # city name
                         city_name = city_info[0]
                         # city weight based on the location API
-                        city_weight = city_info[2]['weight'] # --> refers to city importance score API
+                        city_weight = city_info[2]['weight']  # --> refers to city importance score API
                         # city freq based on the text mention
                         city_freq = all_detected_cities.get(city_name, 1)
 
@@ -350,31 +345,30 @@ class LocationDetection:
         sentences = list(dict.fromkeys(sentences))
 
         # for each sentence, find the NE locations
-        for s in sentences:
-            sentence = Sentence(s)
+        for sentence in sentences:
             try:
-                self.tagger.predict(sentence)
+                ner_pred = self.tagger(sentence)
             except:
                 continue
+            entities_txt = [e['word'] for e in ner_pred if e['entity_group'] == "LOC" and len(e['word']) > 2]
 
             # filter the entities to get only the LOC ones. (apply some cleaning to the detected NE)
-            for entity in sentence.get_spans('ner'):
-                if entity.tag in ['LOC'] and len(entity.text) >= 2:
-                    entity_txt = self.pattern.sub('', entity.text)
-                    entity_txt = re.sub(r'[0-9]+', ' ', entity_txt)
-                    entity_txt = entity_txt.strip().lower()
-                    if not entity_txt or len(entity_txt) <= 2:
-                        continue
+            for entity_txt in entities_txt:
+                entity_txt = self.pattern.sub('', entity_txt)
+                entity_txt = re.sub(r'[0-9]+', ' ', entity_txt)
+                entity_txt = entity_txt.strip().lower()
+                if not entity_txt or len(entity_txt) <= 2:
+                    continue
 
-                    entity_txt = self.mapper.get(entity_txt.lower(), entity_txt)
+                entity_txt = self.mapper.get(entity_txt.lower(), entity_txt)
 
-                    if set(entity_txt.lower().split()).intersection(self.continent_names):
-                        continue
+                if set(entity_txt.lower().split()).intersection(self.continent_names):
+                    continue
 
-                    if entity_txt not in detected_locs:
-                        detected_locs[entity_txt] = 1
-                    else:
-                        detected_locs[entity_txt] = detected_locs[entity_txt] + 1
+                if entity_txt not in detected_locs:
+                    detected_locs[entity_txt] = 1
+                else:
+                    detected_locs[entity_txt] = detected_locs[entity_txt] + 1
 
         detected_locs_matcher = {w: text.lower().count(w) for w in self.all_gt_locs if w in text.lower().split()}
 

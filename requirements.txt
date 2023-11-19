@@ -1,6 +1,5 @@
 networkx==2.6.3
 tldextract
-flair==0.10
 nltk
 scikit-learn
 geopy==2.2.0
@@ -9,3 +8,4 @@ pymongo
 sshtunnel
 pymysql
 clean-text==0.6.0
+transformers==4.35.2
